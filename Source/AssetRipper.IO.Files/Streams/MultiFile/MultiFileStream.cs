@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace AssetRipper.IO.Files.Streams.MultiFile
@@ -74,21 +75,68 @@ namespace AssetRipper.IO.Files.Streams.MultiFile
 			}
 		}
 
+
+		// !! Digital Monster
+		private static Stream DigitalMonster(Stream stream)
+		{
+			byte[] streamBytesIncoming = new byte[stream.Length];
+
+			List<byte> streamBytesOutgoing = new List<byte>();
+
+			stream.Read(streamBytesIncoming, 0, (int)(stream.Length));
+
+			int found = 0;
+
+			string signature = "UnityFS";
+
+			for(int i = 0; i < streamBytesIncoming.Length && i < 1024; i++)
+			{
+				if(match(streamBytesIncoming, Encoding.ASCII.GetBytes(signature), i)){
+					found++;
+				}
+				if(found == 2){
+					byte[] tmp = new byte[streamBytesIncoming.Length - i];
+
+					Array.Copy(streamBytesIncoming, i, tmp, 0, tmp.Length);
+
+					streamBytesOutgoing.AddRange(tmp);
+
+					break;
+				}
+			}
+
+			Stream output = new MemoryStream(streamBytesOutgoing.ToArray());
+
+			return output;
+		}
+
+		private static bool match(byte[] payload, byte[] signature, int idx){
+			for(int i = 0;i < signature.Length;i++){
+				if(payload[idx++] == signature[i]){
+					continue;
+				}else{
+					return false;
+				}
+			}
+			return true;
+		}
+
+
 		public static Stream OpenRead(string path)
 		{
 			if (IsMultiFile(path))
 			{
 				SplitPathWithoutExtension(path, out string directory, out string file);
-				return OpenRead(directory, file);
+				return DigitalMonster(OpenRead(directory, file));
 			}
 			if (File.Exists(path))
 			{
-				return File.OpenRead(path);
+				return DigitalMonster(File.OpenRead(path));
 			}
 
 			{
 				SplitPath(path, out string directory, out string file);
-				return OpenRead(directory, file);
+				return DigitalMonster(OpenRead(directory, file));
 			}
 		}
 
